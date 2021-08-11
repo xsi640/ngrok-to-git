@@ -1,5 +1,5 @@
 authtoken: 4LL5xXpM3V2SkXWo9GodA_6z6WmtTrE2drvoQtVCgZK
 tunnels:
-  myapp-http:
+  tortiose-app:
     addr: 18080
     proto: http

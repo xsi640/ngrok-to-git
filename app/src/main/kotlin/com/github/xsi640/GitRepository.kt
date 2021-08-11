@@ -1,5 +1,6 @@
 package com.github.xsi640
 
+import com.github.xsi640.config.GitConfig
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.transport.CredentialsProvider
 import org.eclipse.jgit.transport.RefSpec
@@ -9,7 +10,7 @@ import java.io.IOException
 import java.net.*
 
 class GitRepository(
-    val config: GistsConfig,
+    val config: GitConfig,
     val gitDir: File
 ) {
 

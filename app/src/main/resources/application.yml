@@ -1,5 +1,6 @@
 ngrok:
   path: /root/ngrok/ngrok
+#  path: /Volumes/Data/tools/ngrok
   log_path: /root/ngrok/ngrok.log
   git:
     username: xsi640

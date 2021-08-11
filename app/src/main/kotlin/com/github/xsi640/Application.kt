@@ -1,6 +1,11 @@
 package com.github.xsi640
 
-import org.apache.commons.io.FileUtils
+import com.fasterxml.jackson.core.JsonParseException
+import com.fasterxml.jackson.core.type.TypeReference
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
+import com.github.xsi640.config.NgrokConfig
+import com.github.xsi640.config.TunnelsConfig
 import org.apache.commons.io.IOUtils
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.DisposableBean
@@ -11,7 +16,8 @@ import org.springframework.boot.runApplication
 import org.springframework.util.FileSystemUtils
 import java.io.File
 import java.io.FileOutputStream
-import java.net.*
+import java.net.URL
+
 
 @SpringBootApplication
 class Application : CommandLineRunner, DisposableBean {
@@ -25,6 +31,7 @@ class Application : CommandLineRunner, DisposableBean {
     private lateinit var gitDir: File
     private lateinit var loggerFileMonitor: LoggerFileMonitor
     private var process: Process? = null
+    private var tunnelsMap = mutableMapOf<String, Int>()
 
     override fun run(vararg args: String?) {
         val app = ngrokConfig.path
@@ -50,11 +57,16 @@ class Application : CommandLineRunner, DisposableBean {
     fun startNgrokService() {
         val app = File(ngrokConfig.path)
         val config = File(app.parentFile, "config.yml")
-        if (config.exists())
-            config.delete()
+        if (!config.exists()) {
+            this.javaClass.getResourceAsStream("/config.yml").use { src ->
+                IOUtils.copy(src, FileOutputStream(config))
+            }
+        }
 
-        this.javaClass.getResourceAsStream("/config.yml").use { src ->
-            IOUtils.copy(src, FileOutputStream(config))
+        val mapper = ObjectMapper(YAMLFactory())
+        val tunnelsConfig = mapper.readValue(config, TunnelsConfig::class.java)
+        tunnelsConfig.tunnels.forEach { k, v ->
+            tunnelsMap[k] = v.addr
         }
 
         val log = File(ngrokConfig.logPath)
@@ -92,46 +104,36 @@ class Application : CommandLineRunner, DisposableBean {
 
         if (map.containsKey("obj") && map["obj"] == "tunnels" &&
             map.containsKey("addr") && map["addr"]!!.isNotEmpty() &&
-            map.containsKey("url") && map["url"]!!.isNotEmpty()
+            map.containsKey("url") && map["url"]!!.isNotEmpty() &&
+            map.containsKey("name") && map["name"]!!.isNotEmpty()
         ) {
-            val addr = URL(map["addr"])
-            val url = URL(map["url"])
-            writeGitFile(url.toString(), addr.port)
+            val name = map["name"]!!.replace("\"", "")
+            if (tunnelsMap.containsKey(name)) {
+                val url = URL(map["url"])
+                writeGitFile(name, url.toString())
+            }
         }
     }
 
-    fun writeGitFile(url: String, port: Int) {
+    fun writeGitFile(name: String, url: String) {
         gitRepository.pull()
         val file = File(gitDir, ngrokConfig.git!!.fileName)
-        val lines = FileUtils.readLines(file, Charsets.UTF_8)
-        val newLines = mutableListOf<String>()
-        var flag = false
-        lines.forEach { line ->
-            val arr = line.split("=")
-            if (arr.size == 2) {
-                if (arr[0].trim() == port.toString()) {
-                    newLines.add("$port=$url")
-                    flag = true
-                } else {
-                    newLines.add(line)
-                }
-            }
-        }
-        if (!flag)
-            newLines.add("$port=$url")
-        if (newLines.isEmpty()) {
-            newLines.add("empty")
-        }
-        logger.info("--> begin update file")
-        newLines.forEach {
-            logger.info("--> $it")
-        }
-        logger.info("--> end update file")
-        FileUtils.writeLines(file, Charsets.UTF_8.name(), newLines)
+        val mapper = ObjectMapper()
 
-        if (!lines.equals(newLines)) {
-            gitRepository.commit("$port=$url")
+        val map = try {
+            mapper.readValue(file, object : TypeReference<Map<String, String>>() {}).toMutableMap()
+        } catch (e: JsonParseException) {
+            mutableMapOf()
         }
+        if (map.containsKey(name) && map[name] == url) {
+            return
+        }
+        map[name] = url
+        logger.info("--> begin update file")
+        logger.info(mapper.writeValueAsString(map))
+        logger.info("--> end update file")
+        mapper.writeValue(file, map)
+        gitRepository.commit("$name=$url")
     }
 
     override fun destroy() {

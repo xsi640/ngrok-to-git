@@ -1,4 +1,4 @@
-package com.github.xsi640
+package com.github.xsi640.config
 
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Configuration
@@ -8,10 +8,10 @@ import org.springframework.context.annotation.Configuration
 class NgrokConfig(
     var path: String = "",
     var logPath: String = "",
-    var git: GistsConfig? = null,
+    var git: GitConfig? = null,
 )
 
-class GistsConfig(
+class GitConfig(
     var username: String = "",
     var password: String = "",
     var url: String = "",
