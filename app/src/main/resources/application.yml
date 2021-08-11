@@ -1,0 +1,9 @@
+ngrok:
+  path: /root/ngrok/ngrok
+  log_path: /root/ngrok/ngrok.log
+  git:
+    username: xsi640
+    password: 830128suyang
+    url: https://gitee.com/xsi640/ngrok-to-git.git
+    fileName: ng
+
